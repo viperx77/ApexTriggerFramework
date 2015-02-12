@@ -1,5 +1,5 @@
 Apex Trigger Framework for Salesforce
-====================================+
+=====================================
 
 Documentation 
 -------------
