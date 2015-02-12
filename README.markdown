@@ -20,4 +20,6 @@ The following examples
 About the Author
 ----------------
 
+Mark Lindell
+
 ```
