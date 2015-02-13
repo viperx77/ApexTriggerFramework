@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingsType>List</customSettingsType>
+    <customSettingsVisibility>Protected</customSettingsVisibility>
+    <description>Configuration for trigger framework handlers</description>
+    <enableFeeds>false</enableFeeds>
+    <fields>
+        <fullName>Apex_Trigger_Handler_Class__c</fullName>
+        <description>The name of the class that implements the TriggerFramework.IHandler class.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>The name of the class that implements the TriggerFramework.IHandler class.</inlineHelpText>
+        <label>Apex Trigger Handler Class</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Enabled__c</fullName>
+        <defaultValue>true</defaultValue>
+        <description>Determines if the handler will process trigger events.</description>
+        <externalId>false</externalId>
+        <label>Enabled</label>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Fields__c</fullName>
+        <description>A comma list of the fields that will be checked for modification on update triggers.  Trigger handlers will only be called if a field in this list changes.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>A comma list of the fields that will be checked for modification on update triggers.  Trigger handlers will only be called if a field in this list changes.</inlineHelpText>
+        <label>Fields</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Max_ReEntry__c</fullName>
+        <defaultValue>1</defaultValue>
+        <description>The maximum number of times the trigger handler may be re-entered.  Defaults to 1 (not-re-entrant)</description>
+        <externalId>false</externalId>
+        <label>Max ReEntry</label>
+        <precision>2</precision>
+        <required>true</required>
+        <scale>0</scale>
+        <trackTrending>false</trackTrending>
+        <type>Number</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Object_Name__c</fullName>
+        <description>The name of the target trigger object</description>
+        <externalId>false</externalId>
+        <inlineHelpText>The name of the target trigger object</inlineHelpText>
+        <label>Object Name</label>
+        <length>255</length>
+        <required>true</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Trigger_Event__c</fullName>
+        <description>The trigger event for the handler.  Must be one of the the following: BeforeInsert, BeforeUpdate, BeforeDelete, AfterInsert, AfterUpdate, AfterDelete, AfterUndelete</description>
+        <externalId>false</externalId>
+        <inlineHelpText>The trigger event for the handler.  Must be one of the the following: BeforeInsert, BeforeUpdate, BeforeDelete, AfterInsert, AfterUpdate, AfterDelete, AfterUndelete</inlineHelpText>
+        <label>Trigger Event</label>
+        <length>15</length>
+        <required>true</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Use_New_Transaction__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Allows handlers to be called in a new transaction that will not roll back other handlers.</description>
+        <externalId>false</externalId>
+        <label>Use New Transaction</label>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <label>Trigger Handler Configuration</label>
+</CustomObject>

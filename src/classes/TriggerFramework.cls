@@ -8,7 +8,7 @@
 	in the Software without restriction, including without limitation the rights
 	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 	copies of the Software, and to permit persons to whom the Software is
-	furnished to do so, subject to the following conditions:
+	furnished to do so, subject to the following conditions: 
 
 	The above copyright notice and this permission notice shall be included in all
 	copies or substantial portions of the Software.
@@ -46,9 +46,6 @@ public with sharing class TriggerFramework {
 	private static Map<String, Integer> recursionDepth = new Map<String, Integer>();
 
 	private static Map<String, Savepoint> savePoints = new Map<String, Savepoint>();
-
-	// Use to cache the configuration across multiple calls
-	private static List<Trigger_Handler_Configuration__c> configurations = null;
 
 	// Use to cache if conventionBasedHandlers are enabled
 	private static Map<String, Boolean> conventionBasedHandlerEnabled = new Map<String, Boolean>();
@@ -101,10 +98,10 @@ public with sharing class TriggerFramework {
     }   
 
 
-	private static Boolean matchesConfiguration(Trigger_Handler_Configuration__c config, String typeName, TriggerFramework.Event event, 
+	private static Boolean matchesConfiguration(String targetObjectName, String triggerEvent, String triggeringObjectName, TriggerFramework.Event event, 
 		Set<String> updatedFieldNames, Set<String> configuredFields) {
 
-		if (config.Name == typeName && config.Trigger_Event__c == event.name()) {
+		if (targetObjectName == triggeringObjectName && triggerEvent == event.name()) {
 			
 			// No configured fields means any field changes calls the handler
 			if (configuredFields.isEmpty()) 
@@ -129,28 +126,22 @@ public with sharing class TriggerFramework {
             return false;
         }
 
-        if (config.maxReentry > 1 && config.useNewTransaction) {
-            return false;
-        }
-
         // Allow to re-enter
         if (triggerContext.getRecursionDepth() <= config.maxReentry) {
             return true;            
         }
+
         return false;
     }
 
     private static TriggerFramework.IHandler createTriggerHandler(Configuration config) {
         // TODO: handle exceptions for mis-configuration?
+        system.debug(config);
         return (TriggerFramework.IHandler)config.handlerType.newInstance();
     }
 
     private static TriggerFramework.IDispatcher createDispatcher(Configuration config) {
-        if (config.isAsync) {
-            return new AsyncTriggerDispatcher();
-        } else {
-            return new DefaultTriggerDispatcher();
-        }
+        return new DefaultTriggerDispatcher();
     }
 
 	private static final List<Schema.DisplayType> STRING_TYPES = new List<Schema.DisplayType>{
@@ -223,7 +214,7 @@ public with sharing class TriggerFramework {
 
     private static Set<String> getModifiedFields(Context triggerContext) {
 
-        /*
+        /*  Valid for each event type:
             BeforeInsert   new
             BeforeUpdate   new      newMap  old     oldMap
             BeforeDelete                    old     oldMap
@@ -351,17 +342,15 @@ public with sharing class TriggerFramework {
 
 	public with sharing class Configuration {
 		
-		public Boolean isAsync { get; private set; }
 		public Decimal maxReentry { get; private set; }
 		public Boolean useNewTransaction { get; private set; }
 		public Type handlerType { get; private set; }
 
 		// Private ctor for factory method
 		private Configuration(Trigger_Handler_Configuration__c config) { 
-			this.handlerType = Type.forName(config.Trigger_Handler_Class_Name__c);
+			this.handlerType = Type.forName(config.Apex_Trigger_Handler_Class__c);
 			this.maxReentry = config.Max_ReEntry__c;
 			this.useNewTransaction = config.Use_New_Transaction__c;
-			this.isAsync = config.Async__c;
 		}
 
 		// Private ctor for factory method
@@ -369,7 +358,6 @@ public with sharing class TriggerFramework {
 			this.handlerType = Type.forName(handlerType);
 			this.maxReentry = 1;
 			this.useNewTransaction = false;
-			this.isAsync = false;
 		}
 	}
 
@@ -377,21 +365,18 @@ public with sharing class TriggerFramework {
 
 		List<Configuration> configurationsFound = new List<Configuration>();
 
-		if (configurations == null) {
-			configurations =  
-				[SELECT Name,Trigger_Handler_Class_Name__c,Async__c,Fields__c,Max_ReEntry__c,Trigger_Event__c,Use_New_Transaction__c,Enabled__c
-					FROM Trigger_Handler_Configuration__c];
-		}
+		List<Trigger_Handler_Configuration__c> configurations =  Trigger_Handler_Configuration__c.getall().values();
 
 		Configuration conventionConfig = getConfigByConvention(context.triggerObject, context.event);
 
-		for (Trigger_Handler_Configuration__c c : configurations ) {
-			if (c.Enabled__c) {
+		for (Trigger_Handler_Configuration__c config : configurations ) {
+
+			if (config.Enabled__c) {
 
 				// Get the comma list of configured fields
 				Set<String> configuredFields = new Set<String>();
-				if (c.Fields__c != null) {
-					configuredFields.addAll(c.Fields__c.split('[,]{1}[\\s]?'));
+				if (config.Fields__c != null) {
+					configuredFields.addAll(config.Fields__c.split('[,]{1}[\\s]?'));
 				}
 
 				// Only need to determine modified fields if there are fields configured
@@ -401,16 +386,16 @@ public with sharing class TriggerFramework {
 					updatedFieldNames = getModifiedFields(context);
 				}
 
-				if (matchesConfiguration(c, context.triggerObject, context.event, updatedFieldNames, configuredFields)) {
-					configurationsFound.add(new Configuration(c));
+				if (matchesConfiguration(config.Object_Name__c, config.Trigger_Event__c, context.triggerObject, context.event, updatedFieldNames, configuredFields)) {
+					configurationsFound.add(new Configuration(config));
 				}				
 			} else if (conventionConfig != null) {
 				// If the configuration has a disabled handler, check if the convention handler
 				// is disabled in the configuration
-				if (!conventionBasedHandlerEnabled.containsKey(c.Trigger_Handler_Class_Name__c)) {
-					conventionBasedHandlerEnabled.put(c.Trigger_Handler_Class_Name__c, c.Enabled__c);
+				if (!conventionBasedHandlerEnabled.containsKey(config.Apex_Trigger_Handler_Class__c)) {
+					conventionBasedHandlerEnabled.put(config.Apex_Trigger_Handler_Class__c, config.Enabled__c);
 				}
-				if (!conventionBasedHandlerEnabled.get(c.Trigger_Handler_Class_Name__c)) {
+				if (!conventionBasedHandlerEnabled.get(config.Apex_Trigger_Handler_Class__c)) {
 					conventionConfig = null;
 				}
 			}
@@ -430,12 +415,10 @@ public with sharing class TriggerFramework {
             Trigger.isExecuting);
 
         try {
-
             context.enterObject();
-
             List<TriggerFramework.Configuration> configs = findConfigFor(context);
-
             for (Configuration config : configs) {
+            	system.debug(config);
                 if (validConfig(config, context)) {
                     try {
                         if (config.useNewTransaction) {
@@ -455,7 +438,7 @@ public with sharing class TriggerFramework {
                 }
             }            
         } finally {
-            context.exitObject();
+        	context.exitObject();
         }
     }
 

@@ -25,13 +25,12 @@ public with sharing class TestHandlerForConfiguration implements TriggerFramewor
 	public static List<TriggerFramework.Context> contexts = new List<TriggerFramework.Context>();
 	public static Boolean reentrantTest = false;
 	public void execute(TriggerFramework.Context context) {
-		system.debug('TestHandlerForConfiguration' + context);
+		system.debug('TestHandlerForConfiguration' + context);		
 		contexts.add(context);
-		if (reentrantTest) {			
-			Account a = (Account)context.newList[0];
-			a.Name='Count='+contexts.size();
-			system.debug(a.Name);
-			update a;
+		if (reentrantTest) {
+			Account firstAccount = (Account)context.newList[0];
+			Account sameAccount = [Select Name FROM Account Where Id=:firstAccount.Id LIMIT 1];
+			update sameAccount;
 		}
 	}
 }

@@ -6,19 +6,11 @@
     </types>
     <types>
         <members>*</members>
-        <name>ApexComponent</name>
-    </types>
-    <types>
-        <members>*</members>
-        <name>ApexPage</name>
-    </types>
-    <types>
-        <members>*</members>
         <name>ApexTrigger</name>
     </types>
     <types>
-        <members>*</members>
-        <name>StaticResource</name>
+        <members>Trigger_Handler_Configuration__c</members>
+        <name>CustomObject</name>
     </types>
     <version>31.0</version>
 </Package>

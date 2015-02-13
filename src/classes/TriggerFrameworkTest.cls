@@ -25,7 +25,6 @@
 @isTest
 public with sharing class TriggerFrameworkTest { 
 
-/*
 	public static testmethod void integration_conventionBasedHandlerExists_isCalled() {		
 		insert new Account(Name='foobar');
 		system.assertEquals(1, AccountBeforeInsertTriggerHandler.contexts.size());
@@ -35,7 +34,9 @@ public with sharing class TriggerFrameworkTest {
 
 	public static testmethod void integration_conventionBasedHandlerIsDisabledInConfiguration_notCalled() {
 		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'AccountBeforeInsertTriggerHandler', 
+				Name = 'AccountBeforeInsertTrigger', 
+				Apex_Trigger_Handler_Class__c = 'AccountBeforeInsertTrigger',
+				Object_Name__c = 'Account',
 				Enabled__c = false, 
 				Trigger_Event__c = 'BeforeInsert');
 		
@@ -44,8 +45,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_configurationBasedHandlerEnabled_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',				
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeInsert');		
 		insert new Account(Name='foobar');		
 		system.assertEquals(1, TestHandlerForConfiguration.contexts.size());
@@ -53,9 +54,11 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
 
+
+
 	public static testmethod void integration_configurationBasedHandlerForAfterInsert_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'AfterInsert');
 		insert new Account(Name='foo');
 		system.assertEquals(1, TestHandlerForConfiguration.contexts.size());
@@ -63,9 +66,11 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
 
+
+
 	public static testmethod void integration_configurationBasedHandlerForBeforeUpdate_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -78,8 +83,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_configurationBasedHandlerForAfterUpdate_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'AfterUpdate');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -92,8 +97,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_configurationBasedHandlerForBeforeDelete_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeDelete');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -105,8 +110,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_configurationBasedHandlerForAfterDelete_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'AfterDelete');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -118,8 +123,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_configurationBasedHandlerForAfterUndelete_isCalled() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'AfterUndelete');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -134,8 +139,8 @@ public with sharing class TriggerFrameworkTest {
 
 	public static testmethod void integration_defaultRentrant_isNotAllowed() {		
 		
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 				
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 				
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate');
 
 		Account a = new Account(Name='foo');
@@ -149,11 +154,10 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[0].event);
 	}
 
-*/
 	public static testmethod void integration_setRentrant_onlyMaxIsAllowed() {
 		
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 				
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 				
 				Enabled__c = true, Trigger_Event__c = 'AfterUpdate',
 				Max_ReEntry__c = 2);
 
@@ -165,14 +169,13 @@ public with sharing class TriggerFrameworkTest {
 		update a;
 
 		system.assertEquals(2, TestHandlerForConfiguration.contexts.size());
-		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[0].event);
-		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[1].event);
+		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[0].event);
+		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[1].event);
 	}
 
-/*
 	public static testmethod void integration_configuredFieldChangedCallsHandler() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -185,8 +188,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_fieldNotChanged_doesNotCallHandler() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -197,8 +200,8 @@ public with sharing class TriggerFrameworkTest {
 	}
 
 	public static testmethod void integration_fieldUpdatedToSameValue_doesNotCallHandler() {
-		insert new Trigger_Handler_Configuration__c (
-				Name = 'Account', Trigger_Handler_Class_Name__c = 'TestHandlerForConfiguration', 
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
 		Account a = new Account(Name='foo');
 		insert a;
@@ -207,5 +210,4 @@ public with sharing class TriggerFrameworkTest {
 		update a;
 		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
 	}
-*/
 }
