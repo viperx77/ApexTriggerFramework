@@ -22,11 +22,19 @@
 	SOFTWARE.
 */
 public with sharing class TestHandlerForConfiguration implements TriggerFramework.IHandler {
+	
 	public static List<TriggerFramework.Context> contexts = new List<TriggerFramework.Context>();
 	public static Boolean reentrantTest = false;
+	public static TriggerFramework.Event throwExceptionOn = null;
+	
 	public void execute(TriggerFramework.Context context) {
+		
 		system.debug('TestHandlerForConfiguration' + context);		
 		contexts.add(context);
+		
+		if (throwExceptionOn == context.event)
+			throw new TriggerFramework.TriggerException('fail on ' + context.event);
+
 		if (reentrantTest) {
 			Account firstAccount = (Account)context.newList[0];
 			Account sameAccount = [Select Name FROM Account Where Id=:firstAccount.Id LIMIT 1];

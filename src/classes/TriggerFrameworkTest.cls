@@ -141,7 +141,7 @@ public with sharing class TriggerFrameworkTest {
 		
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 				
-				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate');
+				Enabled__c = true, Trigger_Event__c = 'AfterUpdate');
 
 		Account a = new Account(Name='foo');
 		insert a;
@@ -151,7 +151,7 @@ public with sharing class TriggerFrameworkTest {
 		update a;
 
 		system.assertEquals(1, TestHandlerForConfiguration.contexts.size());
-		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[0].event);
+		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[0].event);
 	}
 
 	public static testmethod void integration_setRentrant_onlyMaxIsAllowed() {
@@ -173,7 +173,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[1].event);
 	}
 
-	public static testmethod void integration_configuredFieldChangedCallsHandler() {
+	public static testmethod void integration_configuredFieldChangedCallsBeforeUpdateHandler() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
@@ -187,7 +187,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[0].event);
 	}
 
-	public static testmethod void integration_fieldNotChanged_doesNotCallHandler() {
+	public static testmethod void integration_fieldNotChanged_doesNotCallBeforeUpdateHandler() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
@@ -199,7 +199,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
 	}
 
-	public static testmethod void integration_fieldUpdatedToSameValue_doesNotCallHandler() {
+	public static testmethod void integration_fieldUpdatedToSameValue_doesNotCallBeforeUpdateHandler() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
 				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate', Fields__c = 'Name');
@@ -210,4 +210,122 @@ public with sharing class TriggerFrameworkTest {
 		update a;
 		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
 	}
+
+	public static testmethod void integration_configuredFieldChangedCallsAfterUpdateHandler() {
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterUpdate', Fields__c = 'Name');
+		Account a = new Account(Name='foo');
+		insert a;
+		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
+		a.Name='bar';
+		update a;
+
+		system.assertEquals(1, TestHandlerForConfiguration.contexts.size());
+		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[0].event);
+	}
+
+	public static testmethod void integration_fieldNotChanged_doesNotCallAfterUpdateHandler() {
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterUpdate', Fields__c = 'Name');
+		Account a = new Account(Name='foo');
+		insert a;
+		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
+		a.Description='bar';
+		update a;
+		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
+	}
+
+	public static testmethod void integration_fieldUpdatedToSameValue_doesNotCallAfterUpdateHandler() {
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterUpdate', Fields__c = 'Name');
+		Account a = new Account(Name='foo');
+		insert a;
+		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
+		a.Name='foo';
+		update a;
+		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
+	}
+
+	public static testmethod void integration_allHandlersConfigured_callsAll() {
+		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeInsert');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterInsert');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeUpdate',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeUpdate');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterUpdate',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterUpdate');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeDelete',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeDelete');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterDelete',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterDelete');
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterUndelete',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterUndelete');
+		Account a = new Account(Name='foo');
+		insert a;
+		a.Description='bar';
+		update a;
+		delete a;
+		undelete a;
+		system.assertEquals(7, TestHandlerForConfiguration.contexts.size());
+		system.assertEquals(TriggerFramework.Event.BeforeInsert, TestHandlerForConfiguration.contexts[0].event);
+		system.assertEquals(TriggerFramework.Event.AfterInsert, TestHandlerForConfiguration.contexts[1].event);
+		system.assertEquals(TriggerFramework.Event.BeforeUpdate, TestHandlerForConfiguration.contexts[2].event);
+		system.assertEquals(TriggerFramework.Event.AfterUpdate, TestHandlerForConfiguration.contexts[3].event);
+		system.assertEquals(TriggerFramework.Event.BeforeDelete, TestHandlerForConfiguration.contexts[4].event);
+		system.assertEquals(TriggerFramework.Event.AfterDelete, TestHandlerForConfiguration.contexts[5].event);
+		system.assertEquals(TriggerFramework.Event.AfterUndelete, TestHandlerForConfiguration.contexts[6].event);
+	}
+
+	public static testmethod void integration_usesNewTransaction_doesNotFailOtherTransaction() {
+
+		TestHandlerForConfiguration.throwExceptionOn = TriggerFramework.Event.BeforeInsert;
+
+		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeInsert', Use_New_Transaction__c = true);
+
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterInsert');
+
+		Account a = new Account(Name='foo');
+		insert a;
+
+		system.assertEquals(2, TestHandlerForConfiguration.contexts.size());
+		system.assertEquals(TriggerFramework.Event.BeforeInsert, TestHandlerForConfiguration.contexts[0].event);
+		system.assertEquals(TriggerFramework.Event.AfterInsert, TestHandlerForConfiguration.contexts[1].event);
+	}
+
+	public static testmethod void integration_doesNotUseNewTransaction_exceptionStopsProcessing() {
+
+		TestHandlerForConfiguration.throwExceptionOn = TriggerFramework.Event.BeforeInsert;
+
+		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeInsert', Use_New_Transaction__c = false);
+
+		insert new Trigger_Handler_Configuration__c ( Name='AccountAfterInsert',
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'AfterInsert');
+
+		String message = '';
+		try {
+			Account a = new Account(Name='foo');
+			insert a;
+		} Catch (Exception ex) {
+			message = ex.getMessage();
+		}
+		system.assert(message.contains('AccountTrigger: execution of BeforeInsert'));
+	}	
 }

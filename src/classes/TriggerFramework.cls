@@ -136,7 +136,6 @@ public with sharing class TriggerFramework {
 
     private static TriggerFramework.IHandler createTriggerHandler(Configuration config) {
         // TODO: handle exceptions for mis-configuration?
-        system.debug(config);
         return (TriggerFramework.IHandler)config.handlerType.newInstance();
     }
 
@@ -418,7 +417,6 @@ public with sharing class TriggerFramework {
             context.enterObject();
             List<TriggerFramework.Configuration> configs = findConfigFor(context);
             for (Configuration config : configs) {
-            	system.debug(config);
                 if (validConfig(config, context)) {
                     try {
                         if (config.useNewTransaction) {
@@ -433,7 +431,10 @@ public with sharing class TriggerFramework {
                     } catch (Exception ex) {
                         if (config.useNewTransaction) {
                             context.rollbackTrans();
+                        } else {
+                        	throw ex;
                         }
+
                     }
                 }
             }            
@@ -445,7 +446,6 @@ public with sharing class TriggerFramework {
 	public with sharing class AsyncTriggerDispatcher implements TriggerFramework.IDispatcher {
 		public void dispatch(Context triggerContext, IHandler handler) {
 			// TODO: Use Queueable or other async method
-			// Perhaps Batch?
 			handler.execute(triggerContext);
 		}
 	}	
