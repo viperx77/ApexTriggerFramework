@@ -53,10 +53,93 @@ public with sharing class TriggerFramework {
 	// Used to cache configuration for convention based handler
 	private static Map<String, Configuration> conventionBasedHandler = new Map<String, Configuration>();
 
+	// Cache the package namespace
+	private static String packageNamespace = null;
+
 	private static String getSObjectTypeName(SObject so) {
-		return so.getSObjectType().getDescribe().getName();
+		return stripPackageNamespace(so.getSObjectType().getDescribe().getName());
 	}
 
+	// Strips the namespace
+	@TestVisible private static String stripPackageNamespace(String target) {
+		String namespace = getPackageNamespace();
+		if (namespace != '' && startsWith(target, namespace) && target.length() > namespace.length()) {
+			target = target.substring(namespace.length());
+		}
+		return target;
+	}
+
+    private static boolean startsWith(String str, String prefix) {
+        return startsWith(str, prefix, false);
+    }
+
+    private static boolean startsWith(String str, String prefix, boolean ignoreCase) {
+        if (str == null || prefix == null) {
+            return (str == null && prefix == null);
+        }
+        if (prefix.length() > str.length()) {
+            return false;
+        }
+        return regionMatches(str, ignoreCase, 0, prefix, 0, prefix.length());
+    } 
+
+	private static final String EMPTY = '';
+
+    private static String substring(String str, Integer startIndex, Integer endIndex) {
+        if (str == null) {
+            return null;
+        }
+        // handle negatives
+        if (endIndex < 0) {
+            endIndex = str.length() + endIndex; // remember endIndex is negative
+        }
+        if (startIndex < 0) {
+            startIndex = str.length() + startIndex; // remember startIndex is negative
+        }
+
+        // check length next
+        if (endIndex > str.length()) {
+            endIndex = str.length();
+        }
+
+        // if startIndex is greater than endIndex, return ''
+        if (startIndex >= endIndex) {
+            return EMPTY;
+        }
+
+        if (startIndex < 0) {
+            startIndex = 0;
+        }
+        if (endIndex < 0) {
+            endIndex = 0;
+        }
+        return str.substring(startIndex, endIndex);
+    }
+ 	private static boolean regionMatches(String str, boolean ignoreCase, Integer toffset, String other, Integer ooffset, Integer len) {
+        
+        str = substring(str,toffset,toffset+len);
+        other = substring(other,ooffset,ooffset+len);
+        if(ignoreCase){
+            return equalsIgnoreCase(str, other);            
+        }
+        return equals(str, other);                                 
+    }
+
+    private static Boolean equals(String str1, String str2) {
+        return str1 == null ? str2 == null : str1.equals(str2);
+    }
+
+    private static Boolean equalsIgnoreCase(String str1, String str2) {
+        return str1 == null ? str2 == null : str1.equalsIgnoreCase(str2);
+    }
+
+	@TestVisible private static String getPackageNamespace() {
+    	if (packageNamespace == null) {
+    		ApexClass ac = [SELECT NameSpacePrefix FROM ApexClass WHERE Name='TriggerFramework'];
+			packageNamespace = (ac.NameSpacePrefix == null) ? '' : ac.NameSpacePrefix + '__';
+    	}
+    	return packageNamespace;
+	}
 	private static Event getEvent(Boolean isBefore, Boolean isAfter, Boolean isDelete, Boolean isInsert, Boolean isUpdate, Boolean isUndelete) {
 		if (isBefore & isInsert) return Event.BeforeInsert;
 		else if (isBefore && isUpdate) return Event.BeforeUpdate;
@@ -101,8 +184,9 @@ public with sharing class TriggerFramework {
 	private static Boolean matchesConfiguration(String targetObjectName, String triggerEvent, String triggeringObjectName, TriggerFramework.Event event, 
 		Set<String> updatedFieldNames, Set<String> configuredFields) {
 
+		system.debug('TriggerFramework: checking conditions ('+ targetObjectName + '==' + triggeringObjectName + ', ' + triggerEvent + '==' + event.name());
 		if (targetObjectName == triggeringObjectName && triggerEvent == event.name()) {
-			
+
 			// No configured fields means any field changes calls the handler
 			if (configuredFields.isEmpty()) 
 				return true;
@@ -347,7 +431,7 @@ public with sharing class TriggerFramework {
 
 		// Private ctor for factory method
 		private Configuration(Trigger_Handler_Configuration__c config) { 
-			this.handlerType = Type.forName(config.Apex_Trigger_Handler_Class__c);
+			this.handlerType = Type.forName(getPackageNamespace() + config.Apex_Trigger_Handler_Class__c);
 			this.maxReentry = config.Max_ReEntry__c;
 			this.useNewTransaction = config.Use_New_Transaction__c;
 		}
@@ -370,6 +454,7 @@ public with sharing class TriggerFramework {
 
 		for (Trigger_Handler_Configuration__c config : configurations ) {
 
+			system.debug('TriggerFramework: evalute config='+ config);
 			if (config.Enabled__c) {
 
 				// Get the comma list of configured fields
@@ -391,10 +476,11 @@ public with sharing class TriggerFramework {
 			} else if (conventionConfig != null) {
 				// If the configuration has a disabled handler, check if the convention handler
 				// is disabled in the configuration
-				if (!conventionBasedHandlerEnabled.containsKey(config.Apex_Trigger_Handler_Class__c)) {
-					conventionBasedHandlerEnabled.put(config.Apex_Trigger_Handler_Class__c, config.Enabled__c);
+				String key = getPackageNamespace() + config.Apex_Trigger_Handler_Class__c;
+				if (!conventionBasedHandlerEnabled.containsKey(key)) {
+					conventionBasedHandlerEnabled.put(key, config.Enabled__c);
 				}
-				if (!conventionBasedHandlerEnabled.get(config.Apex_Trigger_Handler_Class__c)) {
+				if (!conventionBasedHandlerEnabled.get(key)) {
 					conventionConfig = null;
 				}
 			}
@@ -415,7 +501,9 @@ public with sharing class TriggerFramework {
 
         try {
             context.enterObject();
+            system.debug('TriggerFramework: Context=' + context);
             List<TriggerFramework.Configuration> configs = findConfigFor(context);
+            system.debug('TriggerFramework: Configs=' + configs);
             for (Configuration config : configs) {
                 if (validConfig(config, context)) {
                     try {

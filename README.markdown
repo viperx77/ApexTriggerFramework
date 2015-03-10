@@ -7,10 +7,6 @@ TBD
 
 Documentation 
 -------------
-TBD
-
-Examples
---------
 
 Configure all your triggers as follows:
 
@@ -19,6 +15,27 @@ Configure all your triggers as follows:
 		TriggerFramework.handle();
 	}
 ```
+
+To use convention based handlers, name the class using the following approach:
+
+```java
+	public with sharing class AccountBeforeInsertTriggerHandler implements TriggerFramework.IHandler {
+		public void execute(TriggerFramework.Context context) {
+		}
+	}
+```
+
+The class will be called before insert of the Account object.  The Context object contains the following:
+
+Property      | Description
+--------------|-------------
+Event         | An enumeration of the 7 possible events (BeforeInsert, AfterInsert, BeforeUpdate, AfterUpdate, BeforeDelete, AfterDelete, AfterUndelete)
+oldList       | List<SObject> of the old objects
+newList       | List<SObject> of the new objects
+oldMap        | Map<Id, SObject> of the old objects
+newMap        | Map<Id, SObject> of the new objects
+triggerObject | The name of the object triggering
+isExecuting   | Is the trigger executing
 
 Release History
 ---------------
