@@ -26,12 +26,13 @@
 public with sharing class TriggerFrameworkTest { 
 
 	public static testmethod void integration_conventionBasedHandlerExists_isCalled() {		
+		TriggerFramework.enableConvention = true;
 		insert new Account(Name='foobar');
 		system.assertEquals(1, AccountBeforeInsertTriggerHandler.contexts.size());
 		system.assertEquals(TriggerFramework.Event.BeforeInsert, AccountBeforeInsertTriggerHandler.contexts[0].event);
 		system.assertEquals('Account', AccountBeforeInsertTriggerHandler.contexts[0].triggerObject);
-	}
-
+	}	
+	
 	public static testmethod void integration_conventionBasedHandlerIsDisabledInConfiguration_notCalled() {
 		insert new Trigger_Handler_Configuration__c (
 				Name = 'AccountBeforeInsertTrigger', 
@@ -39,7 +40,7 @@ public with sharing class TriggerFrameworkTest {
 				Object_Name__c = 'Account',
 				Enabled__c = false, 
 				Trigger_Event__c = 'BeforeInsert');
-		
+		TriggerFramework.enableConvention = true;
 		insert new Account(Name='foobar');
 		system.assertEquals(0, AccountBeforeInsertTriggerHandler.contexts.size());
 	}
@@ -54,8 +55,6 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
 
-
-
 	public static testmethod void integration_configurationBasedHandlerForAfterInsert_isCalled() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
@@ -65,8 +64,6 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.AfterInsert, TestHandlerForConfiguration.contexts[0].event);
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
-
-
 
 	public static testmethod void integration_configurationBasedHandlerForBeforeUpdate_isCalled() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
@@ -96,6 +93,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
 
+/*
 	public static testmethod void integration_configurationBasedHandlerForBeforeDelete_isCalled() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
@@ -108,7 +106,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.BeforeDelete, TestHandlerForConfiguration.contexts[0].event);
 		system.assertEquals('Account', TestHandlerForConfiguration.contexts[0].triggerObject);
 	}
-
+*/
 	public static testmethod void integration_configurationBasedHandlerForAfterDelete_isCalled() {
 		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
@@ -248,7 +246,7 @@ public with sharing class TriggerFrameworkTest {
 		update a;
 		system.assertEquals(0, TestHandlerForConfiguration.contexts.size());
 	}
-
+/*
 	public static testmethod void integration_allHandlersConfigured_callsAll() {
 		insert new Trigger_Handler_Configuration__c ( Name='AccountBeforeInsert',
 				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
@@ -286,7 +284,7 @@ public with sharing class TriggerFrameworkTest {
 		system.assertEquals(TriggerFramework.Event.AfterDelete, TestHandlerForConfiguration.contexts[5].event);
 		system.assertEquals(TriggerFramework.Event.AfterUndelete, TestHandlerForConfiguration.contexts[6].event);
 	}
-
+*/
 	public static testmethod void integration_usesNewTransaction_doesNotFailOtherTransaction() {
 
 		TestHandlerForConfiguration.throwExceptionOn = TriggerFramework.Event.BeforeInsert;
@@ -327,5 +325,72 @@ public with sharing class TriggerFrameworkTest {
 			message = ex.getMessage();
 		}
 		system.assert(message.contains('AccountTrigger: execution of BeforeInsert'));
+	}
+
+	public static testmethod void getPackageNamespace_crossCheck() {
+		ApexClass ac = [SELECT NameSpacePrefix FROM ApexClass WHERE Name='TriggerFramework'];
+		if (ac.NameSpacePrefix == null) {
+			// Not packaged
+			System.assertEquals('',  TriggerFramework.getPackageNamespace());
+		} else {
+			// In a packaged org
+			System.assertEquals(ac.NameSpacePrefix,  TriggerFramework.getPackageNamespace());
+		}
+	}
+
+	public static testmethod void stripPackageNamespace_crossCheck() {
+		ApexClass ac = [SELECT NameSpacePrefix FROM ApexClass WHERE Name='TriggerFramework'];
+		if (ac.NameSpacePrefix == null) {
+			// Not packaged
+			System.assertEquals('Foo__c',  TriggerFramework.stripPackageNamespace('Foo__c'));
+		} else {
+			// In a packaged org
+			System.assertEquals('Foo__c',  TriggerFramework.stripPackageNamespace(ac.NameSpacePrefix + '__Foo__c'));
+		}		
+	}
+	
+	public static testmethod void setPackageNamespace_returnsTheSame() {
+		TriggerFramework.setPackageNamespace('foobiz');
+		System.assertEquals('foobiz',  TriggerFramework.getPackageNamespace());
+	}	
+
+	public static testmethod void limit_getPackageNamespace_onlyOneSOQLCall() {
+		TriggerFramework.getPackageNamespace();
+		System.assert(1 == Limits.getQueries());
+		TriggerFramework.getPackageNamespace();
+		System.assert(1 == Limits.getQueries());
+	}
+
+	public static testmethod void limit_getPackageNamespace_noCallsWhenNamespaceSet() {
+		TriggerFramework.setPackageNamespace('foobiz');
+		TriggerFramework.getPackageNamespace();
+		System.assertEquals(0, Limits.getQueries());
+	}
+
+	public static testmethod void limit_conventionHandler_OneSOQLCall() {
+		TriggerFramework.setPackageNamespace('');
+		TriggerFramework.enableConvention = true;
+		insert new Account(Name='1');
+		System.assertEquals(1, Limits.getQueries());
+		insert new Account(Name='2');
+		System.assertEquals(1, Limits.getQueries());
+	}
+
+	public static testmethod void limit_configurationHandler_NoSOQLCall() {
+		TriggerFramework.setPackageNamespace('');
+		insert new Trigger_Handler_Configuration__c ( Name='TestHandlerForConfiguration',				
+				Object_Name__c = 'Account', Apex_Trigger_Handler_Class__c = 'TestHandlerForConfiguration', 
+				Enabled__c = true, Trigger_Event__c = 'BeforeInsert');		
+		TriggerFramework.setPackageNamespace('');
+		insert new Account(Name='1');
+		System.assertEquals(0, Limits.getQueries());
+	}
+
+	public static testmethod void enableConvention_false_doesNotFindHandler() {
+		TriggerFramework.enableConvention = false;
+		TriggerFramework.setPackageNamespace('');
+		insert new Account(Name='1');
+		System.assertEquals(0, AccountBeforeInsertTriggerHandler.contexts.size());		
+		System.assertEquals(0, Limits.getQueries());
 	}	
 }
