@@ -42,6 +42,10 @@ public without sharing class TriggerFramework {
         void execute(Context context);
     }
 
+    public interface IMapFactory {
+        Map<Id,SObject> createEmpty();
+    }
+
     // Used to track the object name and the level
     private static Map<String, Integer> recursionDepth = new Map<String, Integer>();
 
@@ -53,101 +57,22 @@ public without sharing class TriggerFramework {
     // Used to cache configuration for convention based handler
     private static Map<String, Configuration> conventionBasedHandler = new Map<String, Configuration>();
 
-    // Cache the package namespace
-    private static String packageNamespace = null;
+    private static String getSObjectTypeName(List<SObject> oldList, List<SObject> newList) {
+        if(oldList != null && oldList.getSObjectType() != null) {
+            return oldList.getSObjectType().getDescribe().getName();
+        }
 
-    private static String getSObjectTypeName(SObject so) {
-        return stripPackageNamespace(so.getSObjectType().getDescribe().getName());
+        if(newList != null && newList.getSObjectType() != null) {
+            return newList.getSObjectType().getDescribe().getName();
+        }
+
+        return '';
     }
 
     public static Boolean enableConvention = false;
 
-    // Strips the namespace
-    @TestVisible private static String stripPackageNamespace(String target) {
-        String namespacePrefix = getPackageNamespace() +'__' ;
-        if (namespacePrefix != '' && startsWith(target, namespacePrefix) && target.length() > namespacePrefix.length()) {
-            target = target.substring(namespacePrefix.length());
-        }
-        return target;
-    }
-
-    // Use this method if you already have the namespace to save a SOQL query on the getPackageNamespace method
-    public static void setPackageNamespace(String namespace) {
-        packageNamespace = namespace;
-    }
-
-    @TestVisible private static String getPackageNamespace() {
-        if (packageNamespace != null) return packageNamespace;
-        ApexClass ac = [SELECT NameSpacePrefix FROM ApexClass WHERE Name='TriggerFramework'];
-        packageNamespace =  (ac.NameSpacePrefix == null) ? '' : ac.NameSpacePrefix;
-        return packageNamespace;
-    }
-
-    private static boolean startsWith(String str, String prefix) {
-        return startsWith(str, prefix, false);
-    }
-
-    private static boolean startsWith(String str, String prefix, boolean ignoreCase) {
-        if (str == null || prefix == null) {
-            return (str == null && prefix == null);
-        }
-        if (prefix.length() > str.length()) {
-            return false;
-        }
-        return regionMatches(str, ignoreCase, 0, prefix, 0, prefix.length());
-    } 
-
-    private static final String EMPTY = '';
-
-    private static String substring(String str, Integer startIndex, Integer endIndex) {
-        if (str == null) {
-            return null;
-        }
-        // handle negatives
-        if (endIndex < 0) {
-            endIndex = str.length() + endIndex; // remember endIndex is negative
-        }
-        if (startIndex < 0) {
-            startIndex = str.length() + startIndex; // remember startIndex is negative
-        }
-
-        // check length next
-        if (endIndex > str.length()) {
-            endIndex = str.length();
-        }
-
-        // if startIndex is greater than endIndex, return ''
-        if (startIndex >= endIndex) {
-            return EMPTY;
-        }
-
-        if (startIndex < 0) {
-            startIndex = 0;
-        }
-        if (endIndex < 0) {
-            endIndex = 0;
-        }
-        return str.substring(startIndex, endIndex);
-    }
-    private static boolean regionMatches(String str, boolean ignoreCase, Integer toffset, String other, Integer ooffset, Integer len) {
-        
-        str = substring(str,toffset,toffset+len);
-        other = substring(other,ooffset,ooffset+len);
-        if(ignoreCase){
-            return equalsIgnoreCase(str, other);            
-        }
-        return equals(str, other);                                 
-    }
-
-    private static Boolean equals(String str1, String str2) {
-        return str1 == null ? str2 == null : str1.equals(str2);
-    }
-
-    private static Boolean equalsIgnoreCase(String str1, String str2) {
-        return str1 == null ? str2 == null : str1.equalsIgnoreCase(str2);
-    }
     private static Event getEvent(Boolean isBefore, Boolean isAfter, Boolean isDelete, Boolean isInsert, Boolean isUpdate, Boolean isUndelete) {
-        if (isBefore & isInsert) return Event.BeforeInsert;
+        if (isBefore && isInsert) return Event.BeforeInsert;
         else if (isBefore && isUpdate) return Event.BeforeUpdate;
         else if (isBefore && isDelete) return Event.BeforeDelete;
         else if (isAfter && isInsert) return Event.AfterInsert;
@@ -160,10 +85,10 @@ public without sharing class TriggerFramework {
     // Cache all the convention based trigger handler class names
     private static Set<String> triggerHandlerClasses;
 
-    private static Configuration getConfigByConvention(String typeName, TriggerFramework.Event event)
+    private static Configuration getConfigByConvention(TriggerFramework.Context context)
     {
         // Convention example: AccountBeforeInsertTriggerHandler
-        String className = shortensobjectTypeName(typeName) + event.name() + 'TriggerHandler';
+        String className = shortensobjectTypeName(context.triggerObject) + context.event.name() + 'TriggerHandler';
 
         // Use cache
         if (conventionBasedHandler.containsKey(className)) {
@@ -173,16 +98,73 @@ public without sharing class TriggerFramework {
         if (triggerHandlerClasses == null) {
             List<ApexClass> classes = new List<ApexClass>([SELECT Name FROM ApexClass WHERE NAME LIKE '%TriggerHandler']);
             triggerHandlerClasses = pluckString(classes, 'Name');
-            system.debug(triggerHandlerClasses);
         }
 
-        system.debug(className);
         if (triggerHandlerClasses.contains(className)) {
-            conventionBasedHandler.put(className, new Configuration(className));            
+            conventionBasedHandler.put(className, new Configuration(className, context));
         } else {
             conventionBasedHandler.put(className, null);
         }
         return conventionBasedHandler.get(className);
+    }
+
+    private static Set<String> pluckString(List<SObject> records, String fieldName){
+        return pluckString(listToSet(records),fieldName);
+    }
+
+    private static Set<String> pluckString(Set<SObject> records, String fieldName) {
+        return objectToString(pluck(records,fieldName));
+    }
+
+    private static Set<SObject> listToSet(List<SObject> records) {
+        Set<SObject> returnValue = null;
+        if(records != null) {
+            returnValue = new Set<SObject>();
+            if(records.size() > 0){
+                for(SObject record : records) {
+                    returnValue.add(record);
+                }
+            }
+        }
+        return returnValue;
+    }
+
+    private static Set<Object> pluck(List<SObject> records, String fieldName) {
+        return pluck(listToSet(records),fieldName);
+    }   
+     
+    private static Set<Object> pluck(Set<SObject> records, String fieldName) {
+        Set<Object> returnValue = null;
+        if(records != null) {
+            returnValue = new Set<Object>();
+            if(records.size() > 0 && isNotBlank(fieldName)){
+                for(SObject record : records) {
+                    returnValue.add(record.get(fieldName));
+                }
+            }
+        }
+        return returnValue;
+    }
+
+    private static boolean isNotBlank(String str) {
+        return !isBlank(str);
+    }
+
+    private static boolean isBlank(String str) {
+        return str == null || str.trim() == null || str.trim().length() == 0;
+    }
+
+    private static Set<String> objectToString(Set<Object> objectSet){
+        if(objectSet == null){
+            return null;    
+        }
+        Set<String> stringSet = new Set<String>();
+        for(Object anObject : objectSet){
+            if(anObject instanceof String){
+                stringSet.add((String)anObject);
+            }
+        }
+        return stringSet;
     }
 
     private static String shortensobjectTypeName(String objectTypeName) {
@@ -194,26 +176,38 @@ public without sharing class TriggerFramework {
             return objectTypeName;
     }
 
-    private static Boolean matchesConfiguration(String targetObjectName, String triggerEvent, String triggeringObjectName, TriggerFramework.Event event, 
-        Set<String> updatedFieldNames, Set<String> configuredFields) {
+    private static Boolean matchesConfiguration(TriggerFramework.Context context, Trigger_Handler_Configuration__c config, List<Sobject> oldList, List<Sobject> newList) {
 
-        if (targetObjectName == triggeringObjectName && triggerEvent == event.name()) {
+        if (config.Object_Name__c != context.triggerObject || config.Trigger_Event__c != context.event.name())
+            return false;
 
-            // No configured fields means any field changes calls the handler
-            if (configuredFields.isEmpty()) 
-                return true;
-
-            // No fields update check
-            if (updatedFieldNames == null)
-                return true;
-
-            for (String nextUpdatedField : updatedFieldNames) {
-                if (configuredFields.contains(nextUpdatedField)) {
-                    return true;
-                }
-            }               
+        // Get the comma list of configured fields
+        Set<String> configuredFields = new Set<String>();
+        if (config.Fields__c != null) {
+            configuredFields.addAll(config.Fields__c.split('[,]{1}[\\s]?'));
         }
-        return false;
+
+        // No configured fields means any field changes calls the handler
+        if (configuredFields.isEmpty()) 
+            return true;
+
+        // Peform field by field comparison
+        for (SObject source : context.oldList ) {
+            SObject destination = context.newMap.get(source.Id);
+            for (String nextCheckField : configuredFields) {                
+                if (String.valueof(source.get(nextCheckField)) != String.valueof(destination.get(nextCheckField)) ) {
+                    oldList.add(source);
+                    newList.add(destination);
+                }
+            }                
+        }
+
+        // If matching fields with configuration have changed then update the context
+        if (oldList.size() == 0) {
+            return false;
+        }
+
+        return true;
     }
 
     private static Boolean validConfig(Configuration config, Context triggerContext) {
@@ -230,47 +224,29 @@ public without sharing class TriggerFramework {
         return false;
     }
 
-    private static TriggerFramework.IHandler createTriggerHandler(Configuration config) {
-        // TODO: handle exceptions for mis-configuration?
-        return (TriggerFramework.IHandler)config.handlerType.newInstance();
+    private static TriggerFramework.IHandler createTriggerHandler(Configuration config, Context context) {
+        TriggerFramework.IHandler handler = (TriggerFramework.IHandler)config.handlerType.newInstance();
+        return handler;
+    }
+
+    private static void setMapAndListConfigFromHandler(TriggerFramework.IHandler handler, Configuration config, Context context) {
+
+        // Initialize the config with the new maps
+        IMapFactory factory = (IMapFactory)handler;
+        config.oldMap = factory.createEmpty();
+        config.newMap = factory.createEmpty();
+
+        for (SObject next : config.oldList) {
+            config.oldMap.put(next.Id, next);
+        }
+        for (SObject next : config.newList) {
+            config.newMap.put(next.Id, next);
+        }
     }
 
     private static TriggerFramework.IDispatcher createDispatcher(Configuration config) {
         return new DefaultTriggerDispatcher();
     }
-
-    private static final List<Schema.DisplayType> STRING_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.base64
-        ,Schema.DisplayType.Email
-        ,Schema.DisplayType.MultiPicklist
-        ,Schema.DisplayType.Phone
-        ,Schema.DisplayType.Picklist
-        ,Schema.DisplayType.String
-        ,Schema.DisplayType.TextArea
-        ,Schema.DisplayType.URL
-    };
-    private static final List<Schema.DisplayType> INTEGER_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.Integer
-    };
-    private static final List<Schema.DisplayType> ID_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.ID
-        ,Schema.DisplayType.Reference
-    };
-    private static final List<Schema.DisplayType> DOUBLE_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.Currency
-        ,Schema.DisplayType.Double
-        ,Schema.DisplayType.Percent
-    };
-    private static final List<Schema.DisplayType> DATETIME_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.DateTime
-    };
-    private static final List<Schema.DisplayType> DATE_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.Date
-    };
-    private static final List<Schema.DisplayType> BOOLEAN_TYPES = new List<Schema.DisplayType>{
-        Schema.DisplayType.Boolean
-        ,Schema.DisplayType.Combobox
-    };
 
    private static Boolean contains(List<Schema.DisplayType> aListActingAsSet, Schema.DisplayType typeToCheck) {
         if(aListActingAsSet != null && aListActingAsSet.size() > 0){
@@ -295,73 +271,6 @@ public without sharing class TriggerFramework {
         return cachedDescribes.get(objectApiName);
     }
 
-    private static final Map<Schema.DescribeSObjectResult,Map<String,Schema.SObjectField>> cachedFieldDescribes = new Map<Schema.DescribeSObjectResult,Map<String,Schema.SObjectField>>();
-    private static Map<String,Schema.SObjectField> getCachedFieldDescribe(SObject obj){
-        Schema.DescribeSObjectResult schema = getCachedDescribe(obj);
-        if(schema == null){
-            return null;
-        }        
-        if(!cachedFieldDescribes.containsKey(schema)){
-            cachedFieldDescribes.put(schema, schema.fields.getMap());
-        }
-        return cachedFieldDescribes.get(schema);
-    }
-
-    private static Set<String> getModifiedFields(Context triggerContext) {
-
-        /*  Valid for each event type:
-            BeforeInsert   new
-            BeforeUpdate   new      newMap  old     oldMap
-            BeforeDelete                    old     oldMap
-            AfterInsert    new      newMap
-            AfterUpdate    new      newMap  old     oldMap
-            AfterDelete                     old     oldMap
-            AfterUndelete 
-        */
-
-        Set<String> modified = new Set<String>();
-
-        if (triggerContext.event == TriggerFramework.Event.BeforeUpdate || triggerContext.event == TriggerFramework.Event.AfterUpdate) {
-            for (SObject source : triggerContext.newList ) {
-                SObject destination = triggerContext.oldMap.get(source.Id);
-                Map<String,Schema.SObjectField> sourceFields = getCachedFieldDescribe(source);
-                for(String fieldName : sourceFields.keySet()) { 
-                    Schema.DescribeFieldResult sourceField = sourceFields.get(fieldName).getDescribe();
-                    if(contains(STRING_TYPES,sourceField.getType())) {
-                        if ((String)source.get(sourceField.getName()) != (String)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(INTEGER_TYPES,sourceField.getType())) {
-                        if ((Integer)source.get(sourceField.getName()) != (Integer)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(ID_TYPES,sourceField.getType())) {
-                        if ((Id)source.get(sourceField.getName()) != (Id)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(DOUBLE_TYPES,sourceField.getType())) {
-                        if ((Double)source.get(sourceField.getName()) != (Double)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(DATETIME_TYPES,sourceField.getType())) {
-                        if ((DateTime)source.get(sourceField.getName()) != (DateTime)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(DATE_TYPES,sourceField.getType())) {
-                        if ((Date)source.get(sourceField.getName()) != (Date)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    } else if(contains(BOOLEAN_TYPES,sourceField.getType())) {
-                        if ((Boolean)source.get(sourceField.getName()) != (Boolean)destination.get(sourceField.getName())) {
-                            modified.add(sourceField.getName());
-                        }
-                    }
-                }
-            }
-        }
-        return modified;
-    }
-
     public class Context {
 
         public Event event { get; private set;} 
@@ -382,11 +291,11 @@ public without sharing class TriggerFramework {
             this.newList = newList;
             this.oldMap = oldMap;
             this.newMap = newMap;
-            this.triggerObject = getSObjectTypeName((this.oldList != null && this.oldList.size() > 0) ? this.oldList[0] : this.newList[0]);
-            this.event = getEvent(Trigger.isBefore, Trigger.isAfter, Trigger.isDelete, Trigger.isInsert, Trigger.isUpdate, Trigger.isUnDelete);
+            this.triggerObject = getSObjectTypeName(oldList, newList);
+            this.event = getEvent(isBefore, isAfter, isDelete, isInsert, isUpdate, isUnDelete);
             this.isExecuting = isExecuting;
             this.recursionKey = this.triggerObject + '_' + this.event;
-            this.isUpdate = ((this.event == TriggerFramework.Event.BeforeUpdate) || (this.event == TriggerFramework.Event.AfterUpdate));
+            this.isUpdate = isUpdate;
         }
 
         public Integer getRecursionDepth() {
@@ -440,20 +349,29 @@ public without sharing class TriggerFramework {
         public Decimal maxReentry { get; private set; }
         public Boolean useNewTransaction { get; private set; }
         public Type handlerType { get; private set; }
+        public Boolean checksModifiedFields { get; private set; }
+        public List<SObject> oldList { get; set; }
+        public List<SObject> newList { get; set; }
+        public Map<Id,SObject> oldMap { get; set; }
+        public Map<Id,SObject> newMap { get; set; }
 
         // Private ctor for factory method
-        private Configuration(Trigger_Handler_Configuration__c config) { 
+        private Configuration(Trigger_Handler_Configuration__c config, TriggerFramework.Context context, List<Sobject> oldList, List<SObject> newList) { 
             
-            this.handlerType = Type.forName(((packageNamespace == '') ? '' : packageNamespace + '.') + config.Apex_Trigger_Handler_Class__c);
+            this.handlerType = Type.forName(config.Apex_Trigger_Handler_Class__c);
             this.maxReentry = config.Max_ReEntry__c;
             this.useNewTransaction = config.Use_New_Transaction__c;
+            this.checksModifiedFields = !(config.Fields__c == null || String.isEmpty(config.Fields__c));
+            this.oldList = oldList;
+            this.newList = newList;
         }
 
         // Private ctor for factory method
-        private Configuration(String handlerType) {
+        private Configuration(String handlerType, TriggerFramework.Context context) {
             this.handlerType = Type.forName(handlerType);
             this.maxReentry = 1;
             this.useNewTransaction = false;
+            this.checksModifiedFields = false;
         }
     }
 
@@ -463,32 +381,20 @@ public without sharing class TriggerFramework {
 
         List<Trigger_Handler_Configuration__c> configurations =  Trigger_Handler_Configuration__c.getall().values();
 
-        Configuration conventionConfig = (enableConvention) ? getConfigByConvention(context.triggerObject, context.event) : null;
+        Configuration conventionConfig = (enableConvention) ? getConfigByConvention(context) : null;
 
         for (Trigger_Handler_Configuration__c config : configurations ) {
 
             if (config.Enabled__c) {
-
-                // Get the comma list of configured fields
-                Set<String> configuredFields = new Set<String>();
-                if (config.Fields__c != null) {
-                    configuredFields.addAll(config.Fields__c.split('[,]{1}[\\s]?'));
-                }
-
-                // Only need to determine modified fields if there are fields configured
-                // to check and this is an update
-                Set<String> updatedFieldNames = new Set<String>();
-                if (configuredFields.size() != 0 && context.isUpdate) {
-                    updatedFieldNames = getModifiedFields(context);
-                }
-
-                if (matchesConfiguration(config.Object_Name__c, config.Trigger_Event__c, context.triggerObject, context.event, updatedFieldNames, configuredFields)) {
-                    configurationsFound.add(new Configuration(config));
+                List<SObject> oldList = new List<SObject>();
+                List<SObject> newList = new List<SObject>();
+                if (matchesConfiguration(context, config, oldList, newList)) {
+                    configurationsFound.add(new Configuration(config, context, oldList, newList));
                 }               
             } else if (conventionConfig != null) {
                 // If the configuration has a disabled handler, check if the convention handler
                 // is disabled in the configuration
-                String key = getPackageNamespace() + config.Apex_Trigger_Handler_Class__c;
+                String key = config.Apex_Trigger_Handler_Class__c;
                 if (!conventionBasedHandlerEnabled.containsKey(key)) {
                     conventionBasedHandlerEnabled.put(key, config.Enabled__c);
                 }
@@ -519,13 +425,24 @@ public without sharing class TriggerFramework {
                     try {
                         if (config.useNewTransaction) {
                             context.beginTrans();
+                        }                        
+                        TriggerFramework.IHandler handler = createTriggerHandler(config, context);
+                        if (config.checksModifiedFields && handler instanceof IMapFactory) {
+                            setMapAndListConfigFromHandler(handler, config, context);
                         }
-                        TriggerFramework.IHandler handler = createTriggerHandler(config);
                         TriggerFramework.IDispatcher dispatcher = createDispatcher(config);
 
-                        // Use the dispatcher to dispatch this trigger context to the handler
-                        dispatcher.dispatch(context, handler);
-
+                        if (config.checksModifiedFields) {
+                            // Create a new context using the replaced maps and lists on the config
+                            dispatcher.dispatch(
+                                    new Context(config.oldList, config.newList, config.oldMap, config.newMap,
+                                        Trigger.isBefore, Trigger.isAfter, Trigger.isDelete, Trigger.isInsert, Trigger.isUpdate, Trigger.isUnDelete,
+                                        Trigger.isExecuting), 
+                                    handler);
+                        } else
+                        {
+                            dispatcher.dispatch(context, handler);    
+                        }
                     } catch (Exception ex) {
                         if (config.useNewTransaction) {
                             context.rollbackTrans();
@@ -541,71 +458,10 @@ public without sharing class TriggerFramework {
         }
     }
 
-    public with sharing class AsyncTriggerDispatcher implements TriggerFramework.IDispatcher {
-        public void dispatch(Context triggerContext, IHandler handler) {
-            // TODO: Use Queueable or other async method
-            handler.execute(triggerContext);
-        }
-    }   
-
     public with sharing class DefaultTriggerDispatcher implements TriggerFramework.IDispatcher {
         public void dispatch(Context triggerContext, IHandler handler) {
             handler.execute(triggerContext);
         }
     }
 
-    static Set<String> pluckString(List<SObject> records, String fieldName){
-        return pluckString(listToSet(records),fieldName);
-    }
-
-    static Set<String> pluckString(Set<SObject> records, String fieldName){
-        return objectToString(pluck(records,fieldName));
-    }
-
-    static Set<String> objectToString(Set<Object> objectSet){
-        if(objectSet == null){
-            return null;    
-        }
-        Set<String> stringSet = new Set<String>();
-        for(Object anObject : objectSet){
-            if(anObject instanceof String){
-                stringSet.add((String)anObject);
-            }
-        }
-        return stringSet;
-    }
-
-    static Set<SObject> listToSet(List<SObject> records){
-        Set<SObject> returnValue = null;
-        if(records != null){
-            returnValue = new Set<SObject>();
-            if(records.size() > 0){
-                for(SObject record : records){
-                    returnValue.add(record);
-                }
-            }
-        }
-        return returnValue;
-    }
-
-    static Set<Object> pluck(Set<SObject> records, String fieldName){
-        Set<Object> returnValue = null;
-        if(records != null){
-            returnValue = new Set<Object>();
-            if(records.size() > 0 && isNotBlank(fieldName)){
-                for(SObject record : records){
-                    returnValue.add(record.get(fieldName));
-                }
-            }
-        }
-        return returnValue;
-    }
-
-    static boolean isNotBlank(String str) {
-        return !isBlank(str);
-    }
-    
-    static boolean isBlank(String str) {
-        return str == null || str.trim() == null || str.trim().length() == 0;
-    }
 }

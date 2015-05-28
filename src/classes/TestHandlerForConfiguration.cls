@@ -21,7 +21,7 @@
 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 	SOFTWARE.
 */
-public with sharing class TestHandlerForConfiguration implements TriggerFramework.IHandler {
+public with sharing class TestHandlerForConfiguration implements TriggerFramework.IHandler, TriggerFramework.IMapFactory {
 	
 	public static List<TriggerFramework.Context> contexts = new List<TriggerFramework.Context>();
 	public static Boolean reentrantTest = false;
@@ -29,6 +29,9 @@ public with sharing class TestHandlerForConfiguration implements TriggerFramewor
 	
 	public void execute(TriggerFramework.Context context) {
 		
+		Map<Id, Account> m1 = (Map<Id, Account>)context.oldMap;
+		Map<Id, Account> m2 = (Map<Id, Account>)context.newMap;
+
 		system.debug('TestHandlerForConfiguration' + context);		
 		contexts.add(context);
 		
@@ -40,5 +43,9 @@ public with sharing class TestHandlerForConfiguration implements TriggerFramewor
 			Account sameAccount = [Select Name FROM Account Where Id=:firstAccount.Id LIMIT 1];
 			update sameAccount;
 		}
+	}
+
+	public Map<Id,Sobject> createEmpty() {
+		return new Map<Id, Account>();
 	}
 }
